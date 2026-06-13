@@ -67,7 +67,8 @@
   .cal-empty { min-height: 0; }
   .cal-day { background: #0F0F0F; border: 1px solid #1A1A1A; border-radius: 10px; cursor: pointer; position: relative; padding: 4px; min-height: 0; width: 100%; -webkit-appearance: none; appearance: none; outline: none; display: flex; flex-direction: column; gap: 3px; overflow: visible; z-index: 1; }
   .cal-day:active { transform: scale(0.95); }
-  .cal-day.today { border-color: #888; border-width: 1.5px; }
+  .cal-day.today { border-color: #1A1A1A; }
+  .cal-day.today::after { content: ""; position: absolute; inset: -1px; border: 1.5px solid #888; border-radius: 10px; pointer-events: none; z-index: 8; }
   .cal-day.both .cal-daynum { color: #FF3B30; }
   .cal-daynum { font-size: 0.82rem; font-weight: 700; color: #5A5A5A; line-height: 1; text-align: center; padding: 1px 0 2px; }
   .cal-day.today .cal-daynum { color: #fff; }
@@ -441,6 +442,15 @@ const daysInMonth = (y,m) => new Date(y,m+1,0).getDate();
 const firstWeekday = (y,m) => { const d=new Date(y,m,1).getDay(); return d===0?6:d-1; };
 const todayKey = dkey(now.getFullYear(), now.getMonth(), now.getDate());
 
+// Convertit un nombre de personnes en émoji chiffre encerclé (0-10). Au-delà, texte simple + 👤
+function guestEmoji(n) {
+  const num = parseInt(n);
+  if (isNaN(num)) return "";
+  const map = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
+  if (num >= 0 && num <= 10) return map[num];
+  return num + "👤";
+}
+
 function getStatus(dk) {
   const b = bookings[dk];
   const bh = !!(b && b["Bel Horizonte"]), st = !!(b && b["Studio"]);
@@ -642,7 +652,7 @@ function renderCalendar() {
           const info = document.createElement("span");
           info.className = "cal-band-note";
           let txt = "";
-          if (bk.guests) txt += bk.guests + "👤";
+          if (bk.guests) txt += guestEmoji(bk.guests);
           if (bk.note) txt += (txt ? " " : "") + "📝";
           info.textContent = txt;
           band.appendChild(info);
