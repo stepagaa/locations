@@ -65,16 +65,16 @@
   .cal-dow-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; width: 100%; flex-shrink: 0; }
   .cal-dow { text-align: center; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #888; padding: 2px 0 6px; }
   .cal-empty { min-height: 0; }
-  .cal-day { background: #0F0F0F; border: 1px solid #1A1A1A; border-radius: 10px; cursor: pointer; position: relative; padding: 4px; min-height: 0; width: 100%; -webkit-appearance: none; appearance: none; outline: none; display: flex; flex-direction: column; gap: 3px; overflow: visible; z-index: 1; }
+  .cal-day { background: #0F0F0F; border: 1px solid #1A1A1A; border-radius: 10px; cursor: pointer; position: relative; padding: 4px; min-height: 0; min-width: 0; width: 100%; box-sizing: border-box; text-align: inherit; font: inherit; -webkit-appearance: none; appearance: none; outline: none; display: flex; flex-direction: column; gap: 3px; overflow: visible; z-index: 1; }
   .cal-day:active { transform: scale(0.95); }
   .cal-day.today { border-color: #1A1A1A; }
   .cal-day.today::after { content: ""; position: absolute; inset: -1px; border: 1.5px solid #888; border-radius: 10px; pointer-events: none; z-index: 8; }
   .cal-day.both .cal-daynum { color: #FF3B30; }
   .cal-daynum { font-size: 0.82rem; font-weight: 700; color: #5A5A5A; line-height: 1; text-align: center; padding: 1px 0 2px; }
   .cal-day.today .cal-daynum { color: #fff; }
-  .cal-sub { flex: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 700; color: #333; position: relative; }
+  .cal-sub { flex: 1 1 0%; width: 100%; min-width: 0; align-self: stretch; box-sizing: border-box; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 700; color: #333; position: relative; }
   /* Bande de couleur d'une location — fine, centrée verticalement */
-  .cal-band { width: 100%; height: 18px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,0.85); box-sizing: border-box; display: flex; align-items: center; justify-content: center; position: relative; overflow: visible; }
+  .cal-band { width: 100%; flex-shrink: 0; height: 18px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,0.85); box-sizing: border-box; display: flex; align-items: center; justify-content: center; position: relative; overflow: visible; }
   .cal-band.empty-band { border-color: rgba(255,255,255,0.12); }
   .cal-band-note { font-size: 0.58rem; font-weight: 700; color: #fff; line-height: 1; pointer-events: none; white-space: nowrap; }
   /* Prolongement entre nuits consécutives — chaque bande s'étend de la moitié du gap (15px/2 ≈ 8px) pour se rejoindre proprement au milieu */
