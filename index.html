@@ -217,6 +217,10 @@
   .gains-grand-total { background: #161616; border: 1px solid #1E1E1E; border-radius: 12px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
   .gains-grand-label { font-size: 0.72rem; color: #555; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 600; }
   .gains-grand-value { font-size: 1.6rem; font-weight: 700; color: #00C07A; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .gains-switch { display: flex; gap: 8px; margin-bottom: 18px; }
+  .gains-switch-btn { flex: 1; background: #161616; border: 1px solid #1E1E1E; color: #777; border-radius: 10px; padding: 10px 8px; font-family: -apple-system, 'Helvetica Neue', sans-serif; font-size: 0.8rem; font-weight: 600; cursor: pointer; -webkit-appearance: none; }
+  .gains-switch-btn.active { background: #fff; color: #000; border-color: #fff; }
+  .gains-plat-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
 
   /* ── Notes */
   .notes-wrap { padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0)); display: flex; flex-direction: column; gap: 12px; height: calc(100vh - 86px); box-sizing: border-box; }
@@ -294,6 +298,10 @@
 <div class="page" id="pageGains">
   <div class="page-content">
     <div class="page-title">Récapitulatif des gains</div>
+    <div class="gains-switch">
+      <button class="gains-switch-btn active" id="gainsBtnApt" onclick="switchGainsMode('apt')">Par appartement</button>
+      <button class="gains-switch-btn" id="gainsBtnPlat" onclick="switchGainsMode('platform')">Par plateforme</button>
+    </div>
     <div id="gainsContent"></div>
   </div>
 </div>
@@ -1152,7 +1160,21 @@ function toggleJournalDay(dayKey) {
 }
 
 // ── Gains
+let gainsMode = "apt";
+
+function switchGainsMode(mode) {
+  gainsMode = mode;
+  document.getElementById("gainsBtnApt").classList.toggle("active", mode === "apt");
+  document.getElementById("gainsBtnPlat").classList.toggle("active", mode === "platform");
+  renderGains();
+}
+
 function renderGains() {
+  if (gainsMode === "platform") renderGainsByPlatform();
+  else renderGainsByApt();
+}
+
+function renderGainsByApt() {
   const container = document.getElementById("gainsContent");
   const data = {}; let grandTotal = 0;
   Object.keys(bookings).sort().forEach(function(dk) {
@@ -1174,6 +1196,43 @@ function renderGains() {
     html += '<div class="gains-section"><div class="gains-section-title">' + year + '</div><table class="gains-table"><thead><tr><th>Mois</th><th>Bel Horizonte</th><th>Studio</th><th>Total</th></tr></thead><tbody>' + tableRows + '<tr class="total-row"><td>Total ' + year + '</td><td colspan="2"></td><td>' + yearTotal.toLocaleString("fr-FR") + ' €</td></tr></tbody></table></div>';
   });
   html += '<div class="gains-grand-total"><span class="gains-grand-label">Total tous appartements</span><span class="gains-grand-value">' + grandTotal.toLocaleString("fr-FR") + ' €</span></div>';
+  container.innerHTML = html;
+}
+
+function renderGainsByPlatform() {
+  const container = document.getElementById("gainsContent");
+  const data = {}; let grandTotal = 0;
+  const plats = ["Airbnb", "Booking", "Perso"];
+  Object.keys(bookings).sort().forEach(function(dk) {
+    const parts = dk.split("-"), y = parts[0], m = parseInt(parts[1]) - 1;
+    if (!data[y]) data[y] = {};
+    if (!data[y][m]) data[y][m] = { Airbnb: 0, Booking: 0, Perso: 0 };
+    var day = bookings[dk];
+    ["Bel Horizonte", "Studio"].forEach(function(apt) {
+      if (day[apt] && plats.indexOf(day[apt].platform) !== -1) {
+        var r = Number(day[apt].amount || 0);
+        data[y][m][day[apt].platform] += r;
+        grandTotal += r;
+      }
+    });
+  });
+  if (Object.keys(data).length === 0) { container.innerHTML = '<div class="empty-state">Aucune donnée disponible.</div>'; return; }
+  var html = "";
+  var platTotals = { Airbnb: 0, Booking: 0, Perso: 0 };
+  Object.keys(data).sort().reverse().forEach(function(year) {
+    var yearTotal = 0, tableRows = "";
+    Object.keys(data[year]).sort(function(a,b){return b-a;}).forEach(function(m) {
+      var row = data[year][m], monthTotal = row.Airbnb + row.Booking + row.Perso; yearTotal += monthTotal;
+      plats.forEach(function(p) { platTotals[p] += row[p]; });
+      tableRows += '<tr><td>' + MONTHS_FR[m] + '</td><td>' + (row.Airbnb ? row.Airbnb.toLocaleString("fr-FR")+" €" : "—") + '</td><td>' + (row.Booking ? row.Booking.toLocaleString("fr-FR")+" €" : "—") + '</td><td>' + (row.Perso ? row.Perso.toLocaleString("fr-FR")+" €" : "—") + '</td><td style="color:#fff">' + monthTotal.toLocaleString("fr-FR") + ' €</td></tr>';
+    });
+    html += '<div class="gains-section"><div class="gains-section-title">' + year + '</div><table class="gains-table"><thead><tr><th>Mois</th><th>Airbnb</th><th>Booking</th><th>Perso</th><th>Total</th></tr></thead><tbody>' + tableRows + '<tr class="total-row"><td>Total ' + year + '</td><td colspan="3"></td><td>' + yearTotal.toLocaleString("fr-FR") + ' €</td></tr></tbody></table></div>';
+  });
+  html += '<div class="gains-section"><div class="gains-section-title">Répartition par plateforme (toutes années)</div><table class="gains-table"><tbody>' +
+    plats.map(function(p) {
+      return '<tr><td><span class="gains-plat-dot" style="background:' + PLATFORM_COLORS[p] + '"></span>' + p + '</td><td colspan="2"></td><td style="color:#fff">' + platTotals[p].toLocaleString("fr-FR") + ' €</td></tr>';
+    }).join("") + '</tbody></table></div>';
+  html += '<div class="gains-grand-total"><span class="gains-grand-label">Total toutes plateformes</span><span class="gains-grand-value">' + grandTotal.toLocaleString("fr-FR") + ' €</span></div>';
   container.innerHTML = html;
 }
 
