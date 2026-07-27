@@ -221,6 +221,7 @@
   .gains-switch-btn { flex: 1; background: #161616; border: 1px solid #1E1E1E; color: #777; border-radius: 10px; padding: 10px 8px; font-family: -apple-system, 'Helvetica Neue', sans-serif; font-size: 0.8rem; font-weight: 600; cursor: pointer; -webkit-appearance: none; }
   .gains-switch-btn.active { background: #fff; color: #000; border-color: #fff; }
   .gains-plat-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  .gains-count { color: #666; font-size: 0.76rem; font-weight: 500; }
 
   /* ── Notes */
   .notes-wrap { padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0)); display: flex; flex-direction: column; gap: 12px; height: calc(100vh - 86px); box-sizing: border-box; }
@@ -1176,63 +1177,92 @@ function renderGains() {
 
 function renderGainsByApt() {
   const container = document.getElementById("gainsContent");
-  const data = {}; let grandTotal = 0;
+  const data = {}; let grandTotal = 0, grandCount = 0;
+  const seenBH = {}, seenST = {}; // stayId -> true, pour ne compter chaque réservation qu'une fois
   Object.keys(bookings).sort().forEach(function(dk) {
     const parts = dk.split("-"), y = parts[0], m = parseInt(parts[1]) - 1;
     if (!data[y]) data[y] = {};
-    if (!data[y][m]) data[y][m] = { BH: {nights:0,rev:0}, ST: {nights:0,rev:0} };
+    if (!data[y][m]) data[y][m] = { BH: {nights:0,rev:0,count:0}, ST: {nights:0,rev:0,count:0} };
     var day = bookings[dk];
-    if (day["Bel Horizonte"]) { data[y][m].BH.nights++; var r=Number(day["Bel Horizonte"].amount||0); data[y][m].BH.rev+=r; grandTotal+=r; }
-    if (day["Studio"])        { data[y][m].ST.nights++; var r2=Number(day["Studio"].amount||0); data[y][m].ST.rev+=r2; grandTotal+=r2; }
+    if (day["Bel Horizonte"]) {
+      var bk = day["Bel Horizonte"];
+      data[y][m].BH.nights++; var r=Number(bk.amount||0); data[y][m].BH.rev+=r; grandTotal+=r;
+      var sid = bk.stay || ("_solo_"+dk+"_BH");
+      if (!seenBH[sid]) { seenBH[sid]=true; data[y][m].BH.count++; grandCount++; }
+    }
+    if (day["Studio"]) {
+      var bk2 = day["Studio"];
+      data[y][m].ST.nights++; var r2=Number(bk2.amount||0); data[y][m].ST.rev+=r2; grandTotal+=r2;
+      var sid2 = bk2.stay || ("_solo_"+dk+"_ST");
+      if (!seenST[sid2]) { seenST[sid2]=true; data[y][m].ST.count++; grandCount++; }
+    }
   });
   if (Object.keys(data).length === 0) { container.innerHTML = '<div class="empty-state">Aucune donnée disponible.</div>'; return; }
   var html = "";
   Object.keys(data).sort().reverse().forEach(function(year) {
-    var yearTotal = 0, tableRows = "";
+    var yearTotal = 0, yearCount = 0, tableRows = "";
     Object.keys(data[year]).sort(function(a,b){return b-a;}).forEach(function(m) {
-      var row = data[year][m], monthTotal = row.BH.rev + row.ST.rev; yearTotal += monthTotal;
-      tableRows += '<tr><td>' + MONTHS_FR[m] + '</td><td>' + (row.BH.rev ? row.BH.rev.toLocaleString("fr-FR")+" €" : "—") + '</td><td>' + (row.ST.rev ? row.ST.rev.toLocaleString("fr-FR")+" €" : "—") + '</td><td style="color:#fff">' + monthTotal.toLocaleString("fr-FR") + ' €</td></tr>';
+      var row = data[year][m], monthTotal = row.BH.rev + row.ST.rev, monthCount = row.BH.count + row.ST.count;
+      yearTotal += monthTotal; yearCount += monthCount;
+      tableRows += '<tr><td>' + MONTHS_FR[m] + '</td>' +
+        '<td>' + (row.BH.rev ? row.BH.rev.toLocaleString("fr-FR")+" €" : "—") + (row.BH.count ? ' <span class="gains-count">(' + row.BH.count + ')</span>' : '') + '</td>' +
+        '<td>' + (row.ST.rev ? row.ST.rev.toLocaleString("fr-FR")+" €" : "—") + (row.ST.count ? ' <span class="gains-count">(' + row.ST.count + ')</span>' : '') + '</td>' +
+        '<td style="color:#fff">' + monthTotal.toLocaleString("fr-FR") + ' € <span class="gains-count">(' + monthCount + ')</span></td></tr>';
     });
-    html += '<div class="gains-section"><div class="gains-section-title">' + year + '</div><table class="gains-table"><thead><tr><th>Mois</th><th>Bel Horizonte</th><th>Studio</th><th>Total</th></tr></thead><tbody>' + tableRows + '<tr class="total-row"><td>Total ' + year + '</td><td colspan="2"></td><td>' + yearTotal.toLocaleString("fr-FR") + ' €</td></tr></tbody></table></div>';
+    html += '<div class="gains-section"><div class="gains-section-title">' + year + '</div><table class="gains-table"><thead><tr><th>Mois</th><th>Bel Horizonte</th><th>Studio</th><th>Total</th></tr></thead><tbody>' + tableRows + '<tr class="total-row"><td>Total ' + year + '</td><td colspan="2"></td><td>' + yearTotal.toLocaleString("fr-FR") + ' € <span class="gains-count">(' + yearCount + ')</span></td></tr></tbody></table></div>';
   });
   html += '<div class="gains-grand-total"><span class="gains-grand-label">Total tous appartements</span><span class="gains-grand-value">' + grandTotal.toLocaleString("fr-FR") + ' €</span></div>';
+  html += '<div class="gains-grand-total" style="margin-top:8px"><span class="gains-grand-label">Nombre de réservations</span><span class="gains-grand-value" style="color:#fff">' + grandCount + '</span></div>';
   container.innerHTML = html;
 }
 
 function renderGainsByPlatform() {
   const container = document.getElementById("gainsContent");
-  const data = {}; let grandTotal = 0;
+  const data = {}; let grandTotal = 0, grandCount = 0;
   const plats = ["Airbnb", "Booking", "Perso"];
+  const seenStays = {}; // stayId (ou solo) -> true
   Object.keys(bookings).sort().forEach(function(dk) {
     const parts = dk.split("-"), y = parts[0], m = parseInt(parts[1]) - 1;
     if (!data[y]) data[y] = {};
-    if (!data[y][m]) data[y][m] = { Airbnb: 0, Booking: 0, Perso: 0 };
+    if (!data[y][m]) data[y][m] = { Airbnb: {rev:0,count:0}, Booking: {rev:0,count:0}, Perso: {rev:0,count:0} };
     var day = bookings[dk];
     ["Bel Horizonte", "Studio"].forEach(function(apt) {
       if (day[apt] && plats.indexOf(day[apt].platform) !== -1) {
-        var r = Number(day[apt].amount || 0);
-        data[y][m][day[apt].platform] += r;
+        var bk = day[apt];
+        var r = Number(bk.amount || 0);
+        var plat = bk.platform;
+        data[y][m][plat].rev += r;
         grandTotal += r;
+        var sid = bk.stay || ("_solo_"+dk+"_"+apt);
+        if (!seenStays[sid]) { seenStays[sid]=true; data[y][m][plat].count++; grandCount++; }
       }
     });
   });
   if (Object.keys(data).length === 0) { container.innerHTML = '<div class="empty-state">Aucune donnée disponible.</div>'; return; }
   var html = "";
-  var platTotals = { Airbnb: 0, Booking: 0, Perso: 0 };
+  var platTotals = { Airbnb: {rev:0,count:0}, Booking: {rev:0,count:0}, Perso: {rev:0,count:0} };
   Object.keys(data).sort().reverse().forEach(function(year) {
-    var yearTotal = 0, tableRows = "";
+    var yearTotal = 0, yearCount = 0, tableRows = "";
     Object.keys(data[year]).sort(function(a,b){return b-a;}).forEach(function(m) {
-      var row = data[year][m], monthTotal = row.Airbnb + row.Booking + row.Perso; yearTotal += monthTotal;
-      plats.forEach(function(p) { platTotals[p] += row[p]; });
-      tableRows += '<tr><td>' + MONTHS_FR[m] + '</td><td>' + (row.Airbnb ? row.Airbnb.toLocaleString("fr-FR")+" €" : "—") + '</td><td>' + (row.Booking ? row.Booking.toLocaleString("fr-FR")+" €" : "—") + '</td><td>' + (row.Perso ? row.Perso.toLocaleString("fr-FR")+" €" : "—") + '</td><td style="color:#fff">' + monthTotal.toLocaleString("fr-FR") + ' €</td></tr>';
+      var row = data[year][m];
+      var monthTotal = row.Airbnb.rev + row.Booking.rev + row.Perso.rev;
+      var monthCount = row.Airbnb.count + row.Booking.count + row.Perso.count;
+      yearTotal += monthTotal; yearCount += monthCount;
+      plats.forEach(function(p) { platTotals[p].rev += row[p].rev; platTotals[p].count += row[p].count; });
+      tableRows += '<tr><td>' + MONTHS_FR[m] + '</td>' +
+        '<td>' + (row.Airbnb.rev ? row.Airbnb.rev.toLocaleString("fr-FR")+" €" : "—") + (row.Airbnb.count ? ' <span class="gains-count">(' + row.Airbnb.count + ')</span>' : '') + '</td>' +
+        '<td>' + (row.Booking.rev ? row.Booking.rev.toLocaleString("fr-FR")+" €" : "—") + (row.Booking.count ? ' <span class="gains-count">(' + row.Booking.count + ')</span>' : '') + '</td>' +
+        '<td>' + (row.Perso.rev ? row.Perso.rev.toLocaleString("fr-FR")+" €" : "—") + (row.Perso.count ? ' <span class="gains-count">(' + row.Perso.count + ')</span>' : '') + '</td>' +
+        '<td style="color:#fff">' + monthTotal.toLocaleString("fr-FR") + ' € <span class="gains-count">(' + monthCount + ')</span></td></tr>';
     });
-    html += '<div class="gains-section"><div class="gains-section-title">' + year + '</div><table class="gains-table"><thead><tr><th>Mois</th><th>Airbnb</th><th>Booking</th><th>Perso</th><th>Total</th></tr></thead><tbody>' + tableRows + '<tr class="total-row"><td>Total ' + year + '</td><td colspan="3"></td><td>' + yearTotal.toLocaleString("fr-FR") + ' €</td></tr></tbody></table></div>';
+    html += '<div class="gains-section"><div class="gains-section-title">' + year + '</div><table class="gains-table"><thead><tr><th>Mois</th><th>Airbnb</th><th>Booking</th><th>Perso</th><th>Total</th></tr></thead><tbody>' + tableRows + '<tr class="total-row"><td>Total ' + year + '</td><td colspan="3"></td><td>' + yearTotal.toLocaleString("fr-FR") + ' € <span class="gains-count">(' + yearCount + ')</span></td></tr></tbody></table></div>';
   });
   html += '<div class="gains-section"><div class="gains-section-title">Répartition par plateforme (toutes années)</div><table class="gains-table"><tbody>' +
     plats.map(function(p) {
-      return '<tr><td><span class="gains-plat-dot" style="background:' + PLATFORM_COLORS[p] + '"></span>' + p + '</td><td colspan="2"></td><td style="color:#fff">' + platTotals[p].toLocaleString("fr-FR") + ' €</td></tr>';
+      return '<tr><td><span class="gains-plat-dot" style="background:' + PLATFORM_COLORS[p] + '"></span>' + p + '</td><td colspan="2"></td><td style="color:#fff">' + platTotals[p].rev.toLocaleString("fr-FR") + ' € <span class="gains-count">(' + platTotals[p].count + ')</span></td></tr>';
     }).join("") + '</tbody></table></div>';
   html += '<div class="gains-grand-total"><span class="gains-grand-label">Total toutes plateformes</span><span class="gains-grand-value">' + grandTotal.toLocaleString("fr-FR") + ' €</span></div>';
+  html += '<div class="gains-grand-total" style="margin-top:8px"><span class="gains-grand-label">Nombre de réservations</span><span class="gains-grand-value" style="color:#fff">' + grandCount + '</span></div>';
   container.innerHTML = html;
 }
 
