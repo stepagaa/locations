@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Locations</title>
+<title>Locations · DEV</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { height: 100%; -webkit-tap-highlight-color: transparent; overflow: hidden; }
@@ -238,7 +238,7 @@
 <div class="sync-bar">
   <div class="sync-dot" id="syncDot"></div>
   <span class="sync-text" id="syncText">Chargement…</span>
-  <button class="sync-btn" onclick="manualSync()">↻ Sync</button>
+  <button class="sync-btn" onclick="manualSync()">↻ Local</button>
 </div>
 
 <div class="app-nav">
@@ -253,7 +253,7 @@
   <div class="header">
     <div class="header-top">
       <div>
-        <h1 class="title">Locations</h1>
+        <h1 class="title">Locations <span style="color:#FFB300;font-size:.65em;vertical-align:middle">DEV</span></h1>
         <p class="subtitle" id="subtitle">Gestion</p>
       </div>
       <div class="month-nav">
@@ -428,7 +428,7 @@
 
 
 <script>
-var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwErnP_VVyhdgmxO6ppR_4RovQ48KEXPwPvbRhBGupUqvTmJxgjoTg5tUxYo1mUp5fw/exec";
+// DEV isolé : endpoint de production volontairement absent.
 
 const MONTHS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 const DAYS_FR = ["L","M","M","J","V","S","D"];
@@ -544,63 +544,27 @@ function normalizeDate(raw) {
   return s;
 }
 
+// DEV : persistence locale uniquement. Aucun accès au Google Apps Script de production.
 async function loadFromSheets() {
-  setSyncStatus("loading", "Chargement…");
-  try {
-    const res = await fetch(SCRIPT_URL);
-    const json = await res.json();
-    if (!json.ok) throw new Error("err");
-    bookings = {};
-    json.rows.forEach(function(r) {
-      if (!r.date || !r.apt || !r.platform) return;
-      var date = normalizeDate(r.date);
-      if (!bookings[date]) bookings[date] = {};
-      bookings[date][r.apt] = { platform: r.platform, amount: r.amount || "", stay: r.stay || "", note: r.note || "", guests: r.guests || "" };
-    });
-    if (json.journal) journal = json.journal;
-    if (json.notes !== undefined) notes = json.notes;
-    saveLocal();
-    setSyncStatus("ok", "Synchronisé · " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit",minute:"2-digit"}));
-    renderCalendar();
-  } catch(e) {
-    setSyncStatus("error", "Erreur sync — données locales");
-    loadLocal(); renderCalendar();
-  }
+  loadLocal();
+  setSyncStatus("ok", "DEV · Données locales uniquement");
+  renderCalendar();
 }
 
 async function saveToSheets() {
-  setSyncStatus("loading", "Sauvegarde…");
-  try {
-    const rows = [];
-    Object.keys(bookings).sort().forEach(function(date) {
-      Object.keys(bookings[date]).forEach(function(apt) {
-        var b = bookings[date][apt];
-        rows.push({ date: date, apt: apt, platform: b.platform, amount: b.amount || "", stay: b.stay || "", note: b.note || "", guests: b.guests || "" });
-      });
-    });
-    const res = await fetch(SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({ rows: rows, journal: journal, notes: notes })
-    });
-    const json = await res.json();
-    if (!json.ok) throw new Error("err");
-    saveLocal();
-    setSyncStatus("ok", "Sauvegardé · " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit",minute:"2-digit"}));
-  } catch(e) {
-    saveLocal();
-    setSyncStatus("error", "Erreur sync — sauvegarde locale");
-  }
+  saveLocal();
+  setSyncStatus("ok", "DEV · Sauvegarde locale");
 }
 
 function scheduleSave() { saveLocal(); clearTimeout(syncTimeout); syncTimeout = setTimeout(saveToSheets, 1500); }
 function manualSync() { loadFromSheets(); }
 
 function saveLocal() {
-  try { localStorage.setItem("loc_v5", JSON.stringify({ bookings, journal, notes })); } catch(e) {}
+  try { localStorage.setItem("loc_dev_v1", JSON.stringify({ bookings, journal, notes })); } catch(e) {}
 }
 function loadLocal() {
   try {
-    var d = localStorage.getItem("loc_v5");
+    var d = localStorage.getItem("loc_dev_v1");
     if (d) { var p = JSON.parse(d); bookings = p.bookings||{}; journal = p.journal||[]; notes = p.notes||""; }
   } catch(e) {}
 }
